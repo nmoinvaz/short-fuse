@@ -25,7 +25,7 @@
   .full svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: square; }
   .full .in, .full.on .out { display: none; }
   .full.on .in { display: inline; }
-  .note { position: fixed; left: 16px; right: 16px; bottom: 16px; margin: 0; padding: 8px 12px; border-radius: 6px; font: 13px ui-sans-serif, system-ui, sans-serif; background: var(--note-ground); color: var(--note); text-align: center; }
+  .note { position: fixed; left: calc(16px + env(safe-area-inset-left, 0px)); right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); margin: 0; padding: 8px 12px; border-radius: 6px; font: 13px ui-sans-serif, system-ui, sans-serif; background: var(--note-ground); color: var(--note); text-align: center; }
 </style>
 </head>
 <body>
@@ -1338,13 +1338,21 @@ function toggleFullscreen() {
   const go = root.requestFullscreen || root.webkitRequestFullscreen;
   try { const p = go && go.call(root); if (p && p.catch) p.catch(() => {}); } catch (e) { /* refused */ }
 }
-// With "fullscreen" a button does the same, for a phone has no F key. It shows only where the browser gives a
-// page the full screen, which an iPhone does not: there a page fills the screen once it is on the Home Screen.
-if (GAME.fullscreen && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
-  const full = $('full');
+// With "fullscreen" a button does the same, for a phone has no F key. An iPhone's browser gives a page no full
+// screen: a page fills the screen there only when it is started from the Home Screen, so on a phone's own page
+// that is not yet started from there, the button says how. The note stays until the next touch.
+const canFull = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+const fromHome = navigator.standalone === true || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+if (GAME.fullscreen && (canFull || (!fromHome && window.top === window && matchMedia('(pointer: coarse)').matches))) {
+  const full = $('full'), note = $('note');
   full.hidden = false;
   // the button gives the keys back, so Space is the game's again
-  full.addEventListener('click', () => { toggleFullscreen(); full.blur(); });
+  full.addEventListener('click', () => {
+    if (canFull) toggleFullscreen();
+    else { note.textContent = 'This browser gives a page no full screen. Tap Share, then Add to Home Screen, and start the game from its icon.'; note.hidden = false; }
+    full.blur();
+  });
+  if (!canFull) document.addEventListener('pointerdown', e => { if (!gameError && e.target !== full && !full.contains(e.target)) note.hidden = true; }, true);
   for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, () => full.classList.toggle('on', !!(document.fullscreenElement || document.webkitFullscreenElement)));
 }
 const held = new Set();
